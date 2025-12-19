@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>Runic.Algorithms.ToSSA</AssemblyName>
+    <RootNamespace>Runic.Algorithms.ToSSA</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\..\src\Block.cs" Link="Block.cs" />
+    <Compile Include="..\..\src\Instruction.cs" Link="Instruction.cs" />
+    <Compile Include="..\..\src\ToSSA.cs" Link="ToSSA.cs" />
+  </ItemGroup>
+</Project>

@@ -73,7 +73,11 @@ namespace Runic.Algorithms
             List<Block<T>> blocksInOrder = new List<Block<T>>();
             Dictionary<int, Block<T>> blocks = new Dictionary<int, Block<T>>();
             List<Instruction<T>> currentBlockInstructions = new List<Instruction<T>>();
+#if NET6_0_OR_GREATER
             Block<T>? previousBlock = null;
+#else
+            Block<T> previousBlock = null;
+#endif
             int startOffset = _instructions[0].Offset;
             Block<T> currentBlock = new Block<T>(startOffset, currentBlockInstructions);
             blocks.Add(startOffset, currentBlock);
@@ -107,7 +111,11 @@ namespace Runic.Algorithms
                     startOffset = offset;
                 }
                 currentBlockInstructions.Add(_instructions[n]);
+#if NET6_0_OR_GREATER
                 Instruction<T>.Branch<T>? branch = _instructions[n] as Instruction<T>.Branch<T>;
+#else
+                Instruction<T>.Branch<T> branch = _instructions[n] as Instruction<T>.Branch<T>;
+#endif
                 if (branch != null)
                 {
                     Block<T> targetBlock;
