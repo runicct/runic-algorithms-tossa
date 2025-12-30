@@ -61,11 +61,21 @@ namespace Runic.Algorithms
             _instructions.Add(new Instruction<T>.Branch<T>(offset, tag, parameters, conditional, target));
             _labels.Add(target);
         }
+        public void EmitSwitch(int offset, T tag, int[] parameters, int[] targets)
+        {
+            for (int n = 0; n < parameters.Length; n++)
+            {
+                _locals.Add(parameters[n]);
+            }
+            _instructions.Add(new Instruction<T>.Switch<T>(offset, tag, parameters, targets));
+            for (int n = 0; n < targets.Length; n++) { _labels.Add(targets[n]); }
+        }
 
         public virtual void Phi(int offset, int destination, Dictionary<int, int> locals) { }
         public virtual void Assignment(int offset, T tag, int destination, int[] parameters) { }
         public virtual void Statement(int offset, T tag, int[] parameters) { }
         public virtual void Branch(int offset, T tag, int[] parameters, bool conditional, int target) { }
+        public virtual void Switch(int offset, T tag, int[] parameters, int[] targets) { }
         public virtual void UnaliasLocal(int local, int sourceLocal) { }
 
         List<Block<T>> ToBlocks()
@@ -126,7 +136,30 @@ namespace Runic.Algorithms
                     }
                     currentBlock.AddSuccessor(targetBlock);
                     previousWasBranch = true;
-                    conditionalBranch = !branch.Conditional;
+                    conditionalBranch = branch.Conditional;
+                }
+                else
+                {
+#if NET6_0_OR_GREATER
+                Instruction<T>.Switch<T>? @switch = _instructions[n] as Instruction<T>.Switch<T>;
+#else
+                Instruction<T>.Switch<T> @switch = _instructions[n] as Instruction<T>.Switch<T>;
+#endif
+                    if (@switch != null)
+                    {
+                        foreach (int target in @switch.Targets)
+                        {
+                            Block<T> targetBlock;
+                            if (!blocks.TryGetValue(target, out targetBlock))
+                            {
+                                targetBlock = new Block<T>(target, new List<Instruction<T>>());
+                                blocks.Add(target, targetBlock);
+                            }
+                            currentBlock.AddSuccessor(targetBlock);
+                        }
+                        previousWasBranch = true;
+                        conditionalBranch = true;
+                    }
                 }
             }
             return blocksInOrder;

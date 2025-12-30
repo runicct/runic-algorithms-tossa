@@ -81,6 +81,19 @@ namespace Runic.Algorithms
                     toSSA.Branch(Offset, Tag, Parameters, _conditional, _target);
                 }
             }
+            internal class Switch<T> : Instruction<T>
+            {
+                int[] _targets;
+                public int[] Targets { get { return _targets; } }
+                public Switch(int offset, T tag, int[] parameters, int[] targets) : base(offset, tag, parameters)
+                {
+                    _targets = targets;
+                }
+                public override void Emit(ToSSA<T> toSSA)
+                {
+                    toSSA.Switch(Offset, Tag, Parameters, _targets);
+                }
+            }
         }
     }
 }
