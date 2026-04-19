@@ -60,38 +60,79 @@ namespace Runic.Algorithms
                     block.AddPredecessor(this);
                 }
             }
-            void GetPhi(int local, Dictionary<int, int> locals, HashSet<int> visited)
+            class PassthroughPhi
+            {
+                int _local;
+                public int Local { get { return _local; } set { _local = value; } }
+                int _phi;
+                public int Phi { get { return _phi; } set { _phi = value; } }
+                Dictionary<int, int> _predecessors = new Dictionary<int, int>();
+                public Dictionary<int, int> Predecessors { get { return _predecessors; } }
+                public PassthroughPhi(int local, int phi)
+                {
+                    _local = local;
+                    _phi = phi;
+                    _predecessors = new Dictionary<int, int>();
+                }
+            }
+
+
+            Dictionary<int, PassthroughPhi> _passthroughPhi = new Dictionary<int, PassthroughPhi>();
+            int GetPhiRec(int local)
             {
                 int blockLocal = 0;
-                if (locals.ContainsKey(_offset) || visited.Contains(_offset)) { return; }
-                visited.Add(_offset);
-                if (_exportedLocals.TryGetValue(local, out blockLocal))
-                {
-                    locals.Add(_offset, blockLocal);
-                    return;
-                }
+                if (_exportedLocals.TryGetValue(local, out blockLocal)) { return blockLocal; }
                 else
                 {
-                    foreach (Block<T> predecessor in _predecessor.Values)
+                    PassthroughPhi passthroughPhi;
+                    if (!_passthroughPhi.TryGetValue(local, out passthroughPhi))
                     {
-                        predecessor.GetPhi(local, locals, visited);
+                        passthroughPhi = new PassthroughPhi(local, _parent.NewLocal());
+                        _passthroughPhi.Add(local, passthroughPhi);
+                        foreach (Block<T> predecessor in _predecessor.Values)
+                        {
+                            int phiLocal = predecessor.GetPhiRec(local);
+                            passthroughPhi.Predecessors.Add(predecessor.Offset, phiLocal);
+                        }
+                        if (passthroughPhi.Predecessors.Count <= 1)
+                        {
+                            foreach (int predecessor in passthroughPhi.Predecessors.Values)
+                            {
+                                return predecessor;
+                            }
+                        }
                     }
+
+                    return passthroughPhi.Phi;
                 }
             }
             public Dictionary<int, int> GetPhi(int local)
             {
+                HashSet<int> possibilities = new HashSet<int>();
                 Dictionary<int, int> result = new Dictionary<int, int>();
-                HashSet<int> visited = new HashSet<int>();
                 foreach (Block<T> predecessor in _predecessor.Values)
                 {
-                    predecessor.GetPhi(local, result, visited);
+                    result.Add(predecessor.Offset, predecessor.GetPhiRec(local));
                 }
                 return result;
             }
+            public void EmitPassthroughPhi(int offset)
+            {
+                foreach (PassthroughPhi passthroughPhi in _passthroughPhi.Values)
+                {
+                    if (passthroughPhi.Predecessors != null)
+                    {
+                        _parent.Phi(offset, passthroughPhi.Phi, passthroughPhi.Predecessors);
+                    }
+                }
+            }
+            ToSSA<T> _parent;
+
             List<Instruction<T>> _instructions;
             public List<Instruction<T>> Instructions { get { return _instructions; } set { _instructions = value; } } 
-            public Block(int offset, List<Instruction<T>> instructions)
+            public Block(ToSSA<T> parent, int offset, List<Instruction<T>> instructions)
             {
+                _parent = parent;
                 _offset = offset;
                 _instructions = instructions;
             }

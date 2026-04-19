@@ -78,6 +78,19 @@ namespace Runic.Algorithms
         public virtual void Switch(int offset, T tag, int[] parameters, int[] targets) { }
         public virtual void UnaliasLocal(int local, int sourceLocal) { }
 
+        int _nextLocal = 0;
+        int NewLocal()
+        {
+            int newLocal = _nextLocal;
+            do
+            {
+                newLocal++;
+            } while (_locals.Contains(newLocal));
+            _locals.Add(newLocal);
+            _nextLocal = newLocal + 1;
+            return newLocal;
+        }
+
         List<Block<T>> ToBlocks()
         {
             List<Block<T>> blocksInOrder = new List<Block<T>>();
@@ -89,7 +102,7 @@ namespace Runic.Algorithms
             Block<T> previousBlock = null;
 #endif
             int startOffset = _instructions[0].Offset;
-            Block<T> currentBlock = new Block<T>(startOffset, currentBlockInstructions);
+            Block<T> currentBlock = new Block<T>(this, startOffset, currentBlockInstructions);
             blocks.Add(startOffset, currentBlock);
             blocksInOrder.Add(currentBlock);
             bool previousWasBranch = false;
@@ -103,7 +116,7 @@ namespace Runic.Algorithms
                     if (!blocks.TryGetValue(offset, out block))
                     {
                         currentBlockInstructions = new List<Instruction<T>>();
-                        block = new Block<T>(offset, currentBlockInstructions);
+                        block = new Block<T>(this, offset, currentBlockInstructions);
                         blocks.Add(offset, block);
                     }
                     else
@@ -131,7 +144,7 @@ namespace Runic.Algorithms
                     Block<T> targetBlock;
                     if (!blocks.TryGetValue(branch.Target, out targetBlock))
                     {
-                        targetBlock = new Block<T>(branch.Target, new List<Instruction<T>>());
+                        targetBlock = new Block<T>(this, branch.Target, new List<Instruction<T>>());
                         blocks.Add(branch.Target, targetBlock);
                     }
                     currentBlock.AddSuccessor(targetBlock);
@@ -152,7 +165,7 @@ namespace Runic.Algorithms
                             Block<T> targetBlock;
                             if (!blocks.TryGetValue(target, out targetBlock))
                             {
-                                targetBlock = new Block<T>(target, new List<Instruction<T>>());
+                                targetBlock = new Block<T>(this, target, new List<Instruction<T>>());
                                 blocks.Add(target, targetBlock);
                             }
                             currentBlock.AddSuccessor(targetBlock);
@@ -164,7 +177,6 @@ namespace Runic.Algorithms
             }
             return blocksInOrder;
         }
-
         public void Process()
         {
             // First pass: Identify basic blocks
@@ -216,10 +228,26 @@ namespace Runic.Algorithms
                 }
             }
 
+            // Make sure that all the passthroughPhis are populated ahead of time
+            foreach (Block<T> block in blocks)
+            {
+                foreach (Instruction<T> instruction in block.Instructions)
+                {
+                    for (int n = 0; n < instruction.Parameters.Length; n++)
+                    {
+                        if (block.ImportedLocals.Contains(instruction.Parameters[n]))
+                        {
+                            block.GetPhi(instruction.Parameters[n]);
+                        }
+                    }
+                }
+            }
+
             // Third pass: Insert phi functions and emit instructions
             {
                 foreach (Block<T> block in blocks)
                 {
+                    block.EmitPassthroughPhi(block.Offset);
                     foreach (Instruction<T> instruction in block.Instructions)
                     {
                         Dictionary<int, int> translatedLocals = new Dictionary<int, int>();
@@ -249,10 +277,7 @@ namespace Runic.Algorithms
                                         }
                                         else
                                         {
-                                            do
-                                            {
-                                                newLocal++;
-                                            } while (_locals.Contains(newLocal));
+                                            newLocal = NewLocal();
                                             UnaliasLocal(newLocal, instruction.Parameters[n]);
                                             translatedLocals.Add(instruction.Parameters[n], newLocal);
                                             Phi(instruction.Offset, newLocal, phi);
