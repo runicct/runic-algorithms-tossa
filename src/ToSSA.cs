@@ -123,13 +123,16 @@ namespace Runic.Algorithms
                     {
                         currentBlockInstructions = block.Instructions;
                     }
-                    if (!previousWasBranch || conditionalBranch)
+                    if (currentBlock != block)
                     {
-                        block.AddPredecessor(currentBlock);
+                        if (!previousWasBranch || conditionalBranch)
+                        {
+                            block.AddPredecessor(currentBlock);
+                        }
+                        blocksInOrder.Add(block);
                     }
                     previousWasBranch = false;
                     conditionalBranch = false;
-                    blocksInOrder.Add(block);
                     currentBlock = block;
                     startOffset = offset;
                 }
